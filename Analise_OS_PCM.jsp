@@ -366,7 +366,7 @@
     </section>
     <section id="history" class="page" role="tabpanel" hidden>
         <div id="historyCards" class="aging"></div>
-        <article class="panel table-panel"><div class="table-toolbar"><div><h2 class="panel-title">Histórico de O.S.</h2><p class="panel-subtitle">Todas as O.S. do período filtrado, sem recorte de frota ativa ou de manutenção</p></div><div class="table-actions"><span id="historyCount" class="panel-note">0 O.S.</span><div class="column-box"><button id="historyColumnButton" class="action" type="button">Colunas</button><div id="historyColumnMenu" class="column-menu" hidden></div></div><button id="exportHistoryCsv" class="action" type="button">CSV</button><button id="exportHistoryXlsx" class="action primary" type="button">Exportar XLSX</button></div></div><div class="table-wrap"><table id="historyTable" class="data-table"><thead><tr id="historyHead"></tr></thead><tbody id="historyBody"></tbody></table><div id="historyEmpty" class="empty" hidden>Nenhuma O.S. atende aos filtros no período.</div></div><div class="table-foot"><span id="historyShown" class="panel-note">--</span><button id="historyMore" class="action" type="button" hidden>Carregar mais</button></div></article>
+        <article class="panel table-panel"><div class="table-toolbar"><div><h2 class="panel-title">Histórico de O.S.</h2><p class="panel-subtitle">Todas as O.S. do período filtrado, sem recorte de frota ativa ou de manutenção</p></div><div class="table-actions"><span id="historyCount" class="panel-note">0 O.S.</span><div class="column-box"><button id="historyColumnButton" class="action" type="button">Colunas</button><div id="historyColumnMenu" class="column-menu" hidden></div></div><button id="exportHistoryCsv" class="action" type="button">CSV</button><button id="exportHistoryPdf" class="action" type="button">Exportar PDF</button><button id="exportHistoryXlsx" class="action primary" type="button">Exportar XLSX</button></div></div><div class="table-wrap"><table id="historyTable" class="data-table"><thead><tr id="historyHead"></tr></thead><tbody id="historyBody"></tbody></table><div id="historyEmpty" class="empty" hidden>Nenhuma O.S. atende aos filtros no período.</div></div><div class="table-foot"><span id="historyShown" class="panel-note">--</span><button id="historyMore" class="action" type="button" hidden>Carregar mais</button></div></article>
         <p class="method"><strong>Recorte:</strong> esta aba lista todas as O.S. iniciadas dentro do período filtrado, abertas e encerradas, inclusive as de veículos inativos ou fora do escopo de manutenção - por isso a contagem pode ser maior que a das demais abas, que analisam apenas a frota ativa em manutenção. Os demais filtros do painel continuam valendo. O backlog da Torre de controle PCM segue mostrando as O.S. em aberto hoje, inclusive as iniciadas antes do período.</p>
     </section>
 </main>
@@ -704,6 +704,15 @@
             +'<button type="button" onclick="window.print()">Salvar em PDF</button></div>'
             +'<div class="viewer-page">'+buildOrderSheet(row)+'</div></body></html>';
     }
+    function historySheetDocument(rows){
+        var sheets=rows.map(function(row){return'<div class="viewer-page viewer-batch-page">'+buildOrderSheet(row.source)+'</div>'}).join('');
+        return'<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            +'<title>Historico_OS_'+esc(dateInput(new Date()))+'</title><style>'+viewerStyles()+sheetStyles()
+            +'.viewer-batch-page{break-after:page;page-break-after:always}.viewer-batch-page:last-child{break-after:auto;page-break-after:auto}</style></head><body>'
+            +'<div class="viewer-bar"><div><strong>Histórico de Ordens de Serviço - '+esc(fmtNumber(rows.length))+' O.S.</strong>'
+            +'<span>As fichas seguem os filtros e a ordenação da tabela. Use o botão ao lado para salvar o documento em PDF.</span></div>'
+            +'<button type="button" onclick="window.print()">Salvar em PDF</button></div>'+sheets+'</body></html>';
+    }
     function printOrderSheet(){
         var record=state.modalRecord,row=record&&record.type==='os'?orderById.get(record.value):null;
         if(!row)return;
@@ -716,6 +725,21 @@
             view.focus();
         }catch(error){
             window.alert('Não foi possível abrir a ficha em nova aba.');
+            try{view.close()}catch(ignore){}
+        }
+    }
+    function printHistorySheets(){
+        var rows=state.historySorted||[];
+        if(!rows.length){window.alert('Não há O.S. para exportar com os filtros atuais.');return}
+        var view=window.open('','_blank');
+        if(!view){window.alert('Permita a abertura de pop-ups para visualizar o PDF das O.S. filtradas.');return}
+        try{
+            view.document.open();
+            view.document.write(historySheetDocument(rows));
+            view.document.close();
+            view.focus();
+        }catch(error){
+            window.alert('Não foi possível abrir o PDF das O.S. filtradas em nova aba.');
             try{view.close()}catch(ignore){}
         }
     }
@@ -734,7 +758,7 @@
     id('backlogTable').addEventListener('click',function(event){var header=event.target.closest('[data-sort]');if(!header)return;var key=header.dataset.sort;if(state.backlogSort.key===key)state.backlogSort.dir=state.backlogSort.dir==='asc'?'desc':'asc';else{state.backlogSort.key=key;state.backlogSort.dir=key==='os'||key==='fleet'?'asc':'desc'}renderPCM(state.analysis)});
     id('historyTable').addEventListener('click',function(event){var header=event.target.closest('[data-sort]');if(!header)return;var key=header.dataset.sort,column=historyColumn(key);if(!column)return;if(state.historySort.key===key)state.historySort.dir=state.historySort.dir==='asc'?'desc':'asc';else{state.historySort.key=key;state.historySort.dir=column.type==='string'?'asc':'desc'}renderHistory(null,true)});
     id('historyMore').addEventListener('click',function(){state.historyLimit+=HISTORY_PAGE;renderHistory(null,true)});
-    id('exportHistoryXlsx').addEventListener('click',exportHistoryXlsx);id('exportHistoryCsv').addEventListener('click',exportHistoryCsv);
+    id('exportHistoryXlsx').addEventListener('click',exportHistoryXlsx);id('exportHistoryCsv').addEventListener('click',exportHistoryCsv);id('exportHistoryPdf').addEventListener('click',printHistorySheets);
     document.addEventListener('click',function(event){var osButton=event.target.closest('[data-open-os]'),vehicleButton=event.target.closest('[data-open-vehicle]');if(osButton){openOrder(orderById.get(osButton.dataset.openOs),osButton);return}if(vehicleButton)openVehicle(vehicleButton.dataset.openVehicle,vehicleButton)});
     id('qualityButton').addEventListener('click',function(){renderQuality(state.analysis)});id('exportBacklog').addEventListener('click',exportBacklog);id('modalPdf').addEventListener('click',printOrderSheet);id('modalClose').addEventListener('click',closeModal);id('modalFooterClose').addEventListener('click',closeModal);id('mainModal').addEventListener('click',function(event){if(event.target===id('mainModal'))closeModal()});id('modalPrimary').addEventListener('click',function(){if(state.modalRecord&&state.modalRecord.type==='os')openRecord(OS_APP,'NUOS',state.modalRecord.value)});id('modalSecondary').addEventListener('click',function(){if(state.modalRecord&&state.modalRecord.type==='vehicle')openRecord(VEHICLE_APP,'CODVEICULO',state.modalRecord.value)});document.addEventListener('keydown',function(event){if(event.key==='Escape'){closeMenus(null);id('columnMenu').hidden=true;if(!id('mainModal').hidden)closeModal()}});
     render();
